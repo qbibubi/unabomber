@@ -1,6 +1,4 @@
-/*	UNABOMBER - IAT Hook example on 32bit Minesweeper game
-*	
- */
+//	UNABOMBER - IAT Hook example on 32bit Minesweeper game
 
 #include "pch.h"
 #include <windows.h>
@@ -15,9 +13,9 @@ int hookedRand()
 }
 
 
-void hookFunction(PIMAGE_IMPORT_BY_NAME functionName, 
-				PIMAGE_THUNK_DATA originalFirstThunk, 
-				PIMAGE_THUNK_DATA firstThunk) 
+void hookFunction(PIMAGE_IMPORT_BY_NAME	functionName, 
+				PIMAGE_THUNK_DATA	originalFirstThunk, 
+				PIMAGE_THUNK_DATA	firstThunk) 
 {
 	if (std::string(functionName->Name).compare("rand") != 0)
 		return;
@@ -28,10 +26,10 @@ void hookFunction(PIMAGE_IMPORT_BY_NAME functionName,
 }
 
 
-void iterateThroughImports(uint32_t hModule, 
-						PIMAGE_IMPORT_BY_NAME functionName,
-						PIMAGE_THUNK_DATA originalFirstThunk, 
-						PIMAGE_THUNK_DATA firstThunk) 
+void iterateThroughImports(uint32_t	hModule, 
+						PIMAGE_IMPORT_BY_NAME	functionName,
+						PIMAGE_THUNK_DATA	originalFirstThunk, 
+						PIMAGE_THUNK_DATA	firstThunk) 
 {
 	while (originalFirstThunk->u1.AddressOfData != NULL) {
 		functionName = reinterpret_cast<PIMAGE_IMPORT_BY_NAME>(hModule + originalFirstThunk->u1.AddressOfData);
@@ -44,10 +42,10 @@ void iterateThroughImports(uint32_t hModule,
 }
 
 
-void IATHookFunction(uint32_t hModule,
-					PIMAGE_IMPORT_DESCRIPTOR importDescriptor, 
-					LPCSTR libraryName, 
-					HMODULE library) 
+void IATHookFunction(uint32_t	hModule,
+			PIMAGE_IMPORT_DESCRIPTOR	importDescriptor, 
+			LPCSTR	libraryName, 
+			HMODULE	library) 
 {
 	while (importDescriptor->Name != NULL) 
 	{
@@ -66,9 +64,9 @@ void IATHookFunction(uint32_t hModule,
 }
 
 
-BOOL APIENTRY DllMain(	HINSTANCE	hinstDLL, 
-						DWORD		fdwReason, 
-						LPVOID		lpvReserved) 
+BOOL APIENTRY DllMain(HINSTANCE	hinstDLL, 
+				DWORD	fdwReason, 
+				LPVOID	lpvReserved) 
 {
     switch (fdwReason) 
 	{
