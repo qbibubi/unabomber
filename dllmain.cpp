@@ -1,6 +1,5 @@
 //	UNABOMBER - IAT Hook example on 32bit Minesweeper game
 
-#include "pch.h"
 #include <windows.h>
 #include <string>
 
@@ -9,7 +8,8 @@ PrototypeRand prototypeRand = rand();
 int hookedRand() 
 {
 	// { ... }
-	return MessageBoxA(NULL, "IAT Hook", "rand()", NULL);
+	MessageBoxW(NULL, L"Injected inside", L"Injected!", NULL);
+	return 0;
 }
 
 
