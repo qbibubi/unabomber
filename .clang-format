@@ -96,7 +96,7 @@ DisableFormat: "false"
 EmptyLineAfterAccessModifier: Never
 EmptyLineBeforeAccessModifier: Always
 FixNamespaceComments: "false"
-IncludeBlocks: Regroup
+IncludeBlocks: Preserve
 IndentAccessModifiers: "false"
 IndentCaseBlocks: "false"
 IndentCaseLabels: "false"
@@ -128,7 +128,7 @@ RemoveSemicolon: "true"
 RequiresClausePosition: WithFollowing
 RequiresExpressionIndentation: OuterScope
 SeparateDefinitionBlocks: Always
-SortIncludes: CaseInsensitive
+SortIncludes: false
 SortUsingDeclarations: Lexicographic
 SpaceAfterCStyleCast: "false"
 SpaceAfterLogicalNot: "false"

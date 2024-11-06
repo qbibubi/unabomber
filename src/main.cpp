@@ -1,68 +1,115 @@
+#include <iostream>
+#include <format>
+#include <string_view>
+#include <cstdint>
 #include <windows.h>
-#include <string>
+#include <TlHelp32.h>
 
+#define LOG(message) std::cout << std::format("[ {}:{} ]: {}", __FUNCTION__, __LINE__, message) << std::endl;
 
+using namespace std::string_view_literals;
 
+static auto constexpr TargetProgram = "WINMINE.EXE"sv;
 
-using PrototypeRand = int;
-PrototypeRand prototypeRand = rand();
-int hookedRand() 
+[[nodiscard]] static DWORD GetProcessId(std::string_view processName)
 {
-	// { ... }
-	MessageBoxW(NULL, L"Injected inside", L"Injected!", NULL);
-	return 0;
+    DWORD processId = { 0 };
+
+    HANDLE const hProcessList = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hProcessList == INVALID_HANDLE_VALUE)
+    {
+        LOG("CreateToolhelp32Snapshot failed");
+        return processId;
+    }
+
+    PROCESSENTRY32 processEntry = { .dwSize { sizeof(PROCESSENTRY32) } };
+    if (!Process32First(hProcessList, &processEntry))
+    {
+        LOG("Process32First failed");
+        CloseHandle(hProcessList);
+        return processId;
+    }
+
+    do
+    {
+        if (std::string_view(processEntry.szExeFile).compare(processName.data()))
+        {
+            continue;
+        }
+
+        processId = processEntry.th32ProcessID;
+        LOG(std::format("Found {} (PID: {})", processName.data(), processId));
+
+        CloseHandle(hProcessList);
+        return processId;
+    }
+    while (Process32Next(hProcessList, &processEntry));
 }
 
-
-void IATHookFunction(uint32_t hModule, PIMAGE_IMPORT_DESCRIPTOR importDescriptor, LPCSTR libraryName, HMODULE library) 
-{
-	while (importDescriptor->Name != NULL) 
-	{
-		PIMAGE_IMPORT_BY_NAME functionName = NULL;
-		libraryName = reinterpret_cast<LPCSTR>(importDescriptor->Name) + hModule;
-		library = LoadLibraryA(libraryName);
-
-		if (!library) 
-			return;
-
-		PIMAGE_THUNK_DATA originalFirstThunk = reinterpret_cast<PIMAGE_THUNK_DATA>(hModule + importDescriptor->OriginalFirstThunk);
-		PIMAGE_THUNK_DATA firstThunk = reinterpret_cast<PIMAGE_THUNK_DATA>(hModule + importDescriptor->FirstThunk);
-
-		while (originalFirstThunk->u1.AddressOfData != NULL) 
-		{
-			functionName = reinterpret_cast<PIMAGE_IMPORT_BY_NAME>(hModule + originalFirstThunk->u1.AddressOfData);
-
-			if (std::string(functionName->Name).compare("rand") != 0)
-			{
-				return;
-			}
-
-			DWORD oldProtect = NULL;
-			VirtualProtect(reinterpret_cast<LPVOID>(&firstThunk->u1.Function), 8, PAGE_READWRITE, &oldProtect);
-			firstThunk->u1.Function = reinterpret_cast<DWORD_PTR>(hookedRand);
-
-			++originalFirstThunk;
-			++firstThunk;
-		}
-
-		++importDescriptor;
-	}
-}
-
+// template<typename T = void>
+// [[nodiscard]] static bool HookIAT(std::string_view hookedFunctionName, T* hookedFunctionPointer)
+// {
+//     // WINMINE.EXE is a 32-bit executable
+//     auto const baseAddress = reinterpret_cast<uint32_t>(hModule);
+//
+//
+//     auto const dosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(baseAddress);
+//     auto const ntHeaders = reinterpret_cast<PIMAGE_NT_HEADERS>(baseAddress + dosHeader->e_lfanew);
+//
+//     auto const importsDirectoryVA = ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+//     auto importDescriptor = reinterpret_cast<PIMAGE_IMPORT_DESCRIPTOR>(importsDirectoryVA + baseAddress);
+//
+//     while (importDescriptor->Name)
+//     {
+//         PIMAGE_IMPORT_BY_NAME functionName;
+//         moduleFunctionName = reinterpret_cast<LPCSTR>(importDescriptor->Name);
+//
+//         HANDLE hModule = LoadLibraryA(libraryName);
+//         if (!hModule)
+//         {
+//             Log("LoadLibrary failed");
+//             return false;
+//         }
+//
+//         auto originalFirstThunk = reinterpret_cast<PIMAGE_THUNK_DATA>(baseAddress + importDescriptor->OriginalFirstThunk);
+//         auto firstThunk = reinterpret_cast<PIMAGE_THUNK_DATA>(baseAddress + importDescriptor->FirstThunk);
+//
+//         while (originalFirstThunk->u1.AddressOfData)
+//         {
+//             functionName = reinterpret_cast<PIMAGE_IMPORT_BY_NAME>(baseAddress + originalFirstThunk->u1.AddressOfData);
+//             if (std::string_view(functionName->Name).compare(hookedFunctionName.data()) != 0)
+//             {
+//                 continue;
+//             }
+//
+//             DWORD oldProtect;
+//             VirtualProtect(reinterpret_cast<LPVOID>(&firstThunk->u1.Function), 8, PAGE_READWRITE, &oldProtect);
+//             firstThunk->u1.Function = reinterpret_cast<DWORD_PTR>(hookedFunctionPointer);
+//             VirtualProtect(reinterpret_cast<LPVOID>(&firstThunk->u1.Function), 8, oldProtect, &oldProtect);
+//
+//             ++originalFirstThunk;
+//             ++firstThunk;
+//         }
+//
+//         ++importDescriptor;
+//     }
+// }
 
 int main()
 {
-	auto const baseAddress = reinterpret_cast<uint32_t>(GetModuleHandleA(NULL));
-	auto const dosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(baseAddress);
-	auto const ntHeaders = reinterpret_cast<PIMAGE_NT_HEADERS>(baseAddress + dosHeader->e_lfanew);
+    DWORD const processId = GetProcessId("WINMINE.EXE");
+    if (processId == 0)
+    {
+        LOG("Process does not exist");
+        return 1;
+    }
 
-	auto const importsDirectory = ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-	auto const importDescriptor = reinterpret_cast<PIMAGE_IMPORT_DESCRIPTOR>(importsDirectory.VirtualAddress + baseAddress);
+    HANDLE const process = OpenProcess(PROCESS_ALL_ACCESS, false, processId);
+    if (process == 0)
+    {
+        LOG("OpenProcess failed");
+        return 1;
+    }
 
-	LPCSTR libraryName{};
-	HMODULE library{};
-
-	IATHookFunction(baseAddress, importDescriptor, libraryName, library);
-
-	return 0;
+    return 0;
 }
